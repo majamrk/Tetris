@@ -1,2 +1,2 @@
-# Tetris-vulgaris
+# Tetrisv
 A Tetris clone
