@@ -29,6 +29,7 @@ MAGENTA = (255, 0, 255)
 ORANGE = (255, 128, 0)
 BEET = (142, 56, 142)
 
+COLORS = (GREEN, BLUE, YELLOW, RED, MAGENTA, ORANGE, BEET)
 #beet_box = pygame.image.load('beet_box.png')
 #blue_box = pygame.image.load('blue_box.png')
 #green_box = pygame.image.load('green_box.png')
@@ -37,11 +38,106 @@ BEET = (142, 56, 142)
 #red_box = pygame.image.load('red_box.png')
 #yellow_box = pygame.image.load('yellow_box.png')
 
-#shapes.colors = ['beet_box', 'blue_box', 'green_box', 'magenta_box', 'orange_box', 'red_box', 'yellow_box']
 
-#shapes.rotations = {
-	
-#}
+TEMPLATEHIGHT = 4
+TEMPLATEWIDTH = 4
+
+
+L_ROTATIONS = [['----',
+				'-000',
+			    '-0--',
+		    	'----'],
+			   ['--0-',
+				'--0-',
+				'--00',
+				'----'],
+			   ['---0',
+				'-000',
+				'----',
+				'----'],
+			   ['-00-',
+				'--0-',
+				'--0-',
+				'----']]
+
+O_ROTATIONS = [['----',
+				'-00-',
+				'-00-',
+				'----']]
+				
+				  
+Z_ROTATIONS = [['----',
+				'-00-',
+				'--00',
+				'----'],
+			   ['---0',
+				'--00',
+				'--0-',
+				'----']]
+
+
+J_ROTATIONS = [['----',
+				'-000',
+				'---0',
+				'----'],
+			   ['--00',
+				'--0-',
+				'--0-',
+				'----'],
+			   ['-0--',
+				'-000',
+				'----',
+				'----'],
+			   ['--0-',
+				'--0-',
+				'-00-',
+				'----']]
+
+S_ROTATIONS = [['----',
+				'--00',
+				'-00-',
+				'----'],
+			   ['--0-',
+				'--00',
+				'---0',
+				'----']]
+
+
+I_ROTATIONS = [['----',
+				'0000',
+				'----',
+				'----'],
+			   ['--0-',
+				'--0-',
+				'--0-',
+				'--0-']]
+				
+
+T_ROTATIONS = [['----',
+				'-000',
+				'--0-',
+				'----'],
+			   ['--0-',
+				'--00',
+				'--0-',
+				'----'],
+			   ['--0-',
+				'-000',
+				'----',
+				'----'],
+			   ['--0-',
+				'-00-',
+				'--0-',
+				'----']]
+
+
+SHAPES = {'L': L_ROTATIONS,
+		'O': O_ROTATIONS,
+		'Z': Z_ROTATIONS,
+		'J': J_ROTATIONS,
+		'S': S_ROTATIONS,
+		'I': I_ROTATIONS,
+		'T': T_ROTATIONS}
 
 
 BORDEDCOLOR = PURPLE
@@ -66,12 +162,23 @@ def startGame():
 	board = getClearBoard()
 	score = 0
 	level = 0
-	drawingBoard(board)
-	addStatus(level, score)
-	checkingForQuit()
-	pygame.display.update()
-	FPSCLOCK.tick(FPS)
+	fallingPiece = generateNewPiece()
+	nextPiece = generateNewPiece()
 
+	while True:
+		checkingForQuit()
+		DISPLAYSURF.fill(BGCOLOR)
+		drawingBoard(board)
+		addStatus(level, score)
+		addNextPiece(nextPiece)
+		if fallingPiece != None:
+			addPiece(fallingPiece)
+		
+		pygame.display.update()
+		FPSCLOCK.tick(FPS)
+
+
+	
 
 def checkingForQuit():
 	# first get all quit events
@@ -95,6 +202,10 @@ def drawingBoard(board):
 	# draw the background of the board
 	pygame.draw.rect(DISPLAYSURF, BGCOLOR, (XMARGIN, TOPMARGIN, BOARDWIDTH * BOXSIZE, BOARDHEGIHT * BOXSIZE))
 
+	for x in range(BOARDWIDTH):
+		for y in range(BOARDHEGIHT):
+			addSquare(x, y, board[x][y])
+
 
 def addStatus(level, score):
 	# drawing level text
@@ -115,6 +226,46 @@ def getClearBoard():
 	for i in range(BOARDWIDTH):
 		board.append([BLANK] * BOARDHEGIHT)
 	return board
+
+def addSquare(boxx, boxy, color, pixelx = None, pixely = None):
+	if color == BLANK:
+		return
+	if pixelx == None and pixely == None:
+		pixelx, pixely = convertToPixelCoords(boxx, boxy)
+
+	pygame.draw.rect(DISPLAYSURF, COLORS[color], (pixelx + 1, pixely + 1, BOXSIZE - 1, BOXSIZE - 1))
+
+def generateNewPiece():
+	shape = random.choice(list(SHAPES.keys()))
+	newPiece = {'shape': shape,
+				'rotation': random.randint(0, len(SHAPES[shape]) - 1),
+				'x': int(BOARDWIDTH / 2) - int(TEMPLATEWIDTH / 2),
+				'y': -4,
+				'color': random.randint(0, len(COLORS) - 1)}
+	return newPiece
+
+
+def convertToPixelCoords(boxx, boxy):
+	return (XMARGIN + (boxx * BOXSIZE)), (TOPMARGIN + (boxy * BOXSIZE))
+
+def addPiece(piece, pixelx = None, pixely = None):
+	shapeToDraw = SHAPES[piece['shape']][piece['rotation']]
+	if pixelx == None and pixely == None:
+		pixelx, pixely = convertToPixelCoords(piece['x'], piece['y'])
+
+	for x in range(TEMPLATEWIDTH):
+		for y in range(TEMPLATEHIGHT):
+			if shapeToDraw[y][x] != BLANK:
+				addSquare(None, None, piece['color'], pixelx + (x * BOXSIZE), pixely + (y * BOXSIZE))
+				
+
+def addNextPiece(piece):
+	nextSurf = BASICFONT.render('Next: ', True, TEXTCOLOR)
+	nextRect = nextSurf.get_rect()
+	nextRect.topleft = (WINDOWWIDTH - 220, 350)
+	DISPLAYSURF.blit(nextSurf, nextRect)
+
+	addPiece(piece, pixelx = WINDOWWIDTH - 230, pixely = 380)
 
 
 if __name__ == '__main__':
