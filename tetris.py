@@ -6,7 +6,7 @@ WINDOWWIDTH = 640
 WINDOWHEIGHT = 480
 BOXSIZE = 20
 BOARDWIDTH = 10
-BOARDHEGIHT = 20
+BOARDHEGIHT = 23
 BLANK = '-'
 
 MOVESIDEWAYSFREQ = 0.15
@@ -18,10 +18,9 @@ YMARGIN = int((WINDOWWIDTH - BOARDWIDTH * BOXSIZE) / 3)
 
 # R G B
 WHITE = (255, 255, 255)
-GRAY = (185, 185, 185)
 BLACK = (0, 0, 0)
 GREEN = (0, 155, 0)
-BLUE = (0, 0, 155)
+BLUE = (72, 118, 255)
 YELLOW = (255, 255, 0)
 RED = (220, 20, 60)
 PURPLE = (155, 48, 255)
@@ -30,13 +29,7 @@ ORANGE = (255, 128, 0)
 BEET = (142, 56, 142)
 
 COLORS = (GREEN, BLUE, YELLOW, RED, MAGENTA, ORANGE, BEET)
-#beet_box = pygame.image.load('beet_box.png')
-#blue_box = pygame.image.load('blue_box.png')
-#green_box = pygame.image.load('green_box.png')
-#magenta_box = pygame.image.load('magenta_box.png')
-#orange_box = pygame.image.load('orange_box.png')
-#red_box = pygame.image.load('red_box.png')
-#yellow_box = pygame.image.load('yellow_box.png')
+
 
 
 TEMPLATEHIGHT = 4
@@ -143,7 +136,7 @@ SHAPES = {'L': L_ROTATIONS,
 BORDEDCOLOR = PURPLE
 BGCOLOR = BLACK
 TEXTCOLOR = WHITE
-SHADOWCOLOR = GRAY
+
 
 
 def main():
@@ -157,16 +150,98 @@ def main():
 
 	while True:
 		startGame()
+		addTextScreen('Game Over')
 
 def startGame():
 	board = getClearBoard()
+	lastDropDownTime = time.time()
+	lastDropTime = time.time()
+	lastMovingSidewaysTime = time.time()
+	movingLeft = False
+	movingRight = False
+	movingDown = False
 	score = 0
-	level = 0
+
+	level, fallFreq = getLevelAndFallFreq(score)
+
 	fallingPiece = generateNewPiece()
 	nextPiece = generateNewPiece()
 
 	while True:
+		if fallingPiece == None:
+			fallingPiece = nextPiece
+			nextPiece = generateNewPiece()
+			lastDropTime = time.time()
+
+			if not possiblePosition(board, fallingPiece):
+				return
+
 		checkingForQuit()
+
+		for event in pygame.event.get():
+			if event.type == KEYUP:
+				if event.key == K_p:
+					DISPLAYSURF.fill(BGCOLOR)
+					addTextScreen('Paused')
+					lastDropTime = time.time()
+					lastDropDownTime = time.time()
+					lastMovingSidewaysTime = time.time()
+				elif event.key == K_LEFT:
+					movingLeft = False
+				elif event.key == K_RIGHT:
+					movingRight = False
+				elif event.key == K_DOWN:
+					movingDown = False
+
+			elif event.type == KEYDOWN:
+				if event.key == K_LEFT and possiblePosition(board, fallingPiece, adjX = -1):
+					fallingPiece['x'] -= 1
+					movingLeft = True
+					movingRight = False
+					lastMovingSidewaysTime = time.time()
+
+				elif event.key == K_RIGHT and possiblePosition(board, fallingPiece, adjX = 1):
+					fallingPiece['x'] += 1
+					movingRight = True
+					movingLeft = False
+					lastMovingSidewaysTime = time.time()
+
+				elif event.key == K_UP:
+					fallingPiece['rotation'] = (fallingPiece['rotation'] + 1) % len(SHAPES[fallingPiece['shape']])
+					if not possiblePosition(board, fallingPiece):
+						fallingPiece['rotation'] = (fallingPiece['rotation'] - 1) % len(SHAPES[fallingPiece['shape']])
+
+				elif event.key == K_SPACE:
+					movingDown = False
+					movingLeft = False
+					movingRight = False
+					for i in range(1, BOARDHEGIHT):
+						if not possiblePosition(board, fallingPiece, adjY = i):
+							break
+					fallingPiece['y'] += i - 1
+
+		if (movingRight or movingLeft) and time.time() - lastMovingSidewaysTime > MOVESIDEWAYSFREQ:
+			if movingRight and possiblePosition(board, fallingPiece, adjX = 1):
+				fallingPiece['x'] += 1
+			elif movingLeft and possiblePosition(board, fallingPiece, adjX = -1):
+				fallingPiece['x'] -= 1
+			lastMovingSidewaysTime = time.time()
+
+
+
+		if time.time() - lastDropTime > fallFreq:
+			if not possiblePosition(board, fallingPiece, adjY = 1):
+				drawOnBoard(board, fallingPiece)
+				score += eraseCompletedLines(board)
+				level, fallFreq = getLevelAndFallFreq(score)
+				fallingPiece = None
+			else:
+				fallingPiece['y'] += 1
+				lastDropTime = time.time()
+			
+
+					
+
 		DISPLAYSURF.fill(BGCOLOR)
 		drawingBoard(board)
 		addStatus(level, score)
@@ -240,7 +315,7 @@ def generateNewPiece():
 	newPiece = {'shape': shape,
 				'rotation': random.randint(0, len(SHAPES[shape]) - 1),
 				'x': int(BOARDWIDTH / 2) - int(TEMPLATEWIDTH / 2),
-				'y': -4,
+				'y': 0,
 				'color': random.randint(0, len(COLORS) - 1)}
 	return newPiece
 
@@ -266,6 +341,76 @@ def addNextPiece(piece):
 	DISPLAYSURF.blit(nextSurf, nextRect)
 
 	addPiece(piece, pixelx = WINDOWWIDTH - 230, pixely = 380)
+
+def getLevelAndFallFreq(score):
+	level = int(score / 15) + 1
+	fallFreq = 0.25 - (level * 0.02)
+	return level, fallFreq
+
+def createTextObjects(text, font, color):
+	surf = font.render(text, True, color)
+	return surf, surf.get_rect()
+
+def addTextScreen(text):
+	titleSurf, titleRect = createTextObjects(text, BIGFONT, TEXTCOLOR)
+	titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2) - 5)
+	DISPLAYSURF.blit(titleSurf, titleRect)
+
+	while chekingForKeyPress() == None:
+		pygame.display.update()
+		FPSCLOCK.tick()
+
+def chekingForKeyPress():
+	checkingForQuit()
+
+	for event in pygame.event.get([KEYDOWN, KEYUP]):
+		if event.type == KEYDOWN:
+			continue
+		return event.key
+	return None
+
+def pieceOnBoard(x, y):
+	return x >= 0 and x < BOARDWIDTH and y < BOARDHEGIHT
+
+def possiblePosition(board, piece, adjX = 0, adjY = 0):
+	for x in range(TEMPLATEWIDTH):
+		for y in range(TEMPLATEHIGHT):
+			overBoard = y + piece['y'] + adjY < 0
+			if overBoard or SHAPES[piece['shape']][piece['rotation']][y][x] == BLANK:
+				continue
+			if not pieceOnBoard(x + piece['x'] + adjX, y + piece['y'] + adjY):
+				return False
+			if board[x + piece['x'] + adjX][y + piece['y'] + adjY] != BLANK:
+				return False
+	return True
+
+
+def drawOnBoard(board, piece):
+	for x in range(TEMPLATEWIDTH):
+		for y in range(TEMPLATEHIGHT):
+			if SHAPES[piece['shape']][piece['rotation']][y][x] != BLANK:
+				board[x + piece['x']][y + piece['y']] = piece['color']
+
+
+def completedLine(board, y):
+	for x in range(BOARDWIDTH):
+		if board[x][y] == BLANK:
+			return False
+	return True
+
+def eraseCompletedLines(board):
+	linesRemoved = 0
+	y = BOARDHEGIHT - 1
+	while y >= 0:
+		if completedLine(board, y):
+			for drawDownY in range(y, 0, -1):
+				for x in range(BOARDWIDTH):
+					board[x][drawDownY] = board[x][drawDownY - 1]
+			linesRemoved += 1
+
+		else:
+			y -= 1	
+	return linesRemoved	
 
 
 if __name__ == '__main__':
